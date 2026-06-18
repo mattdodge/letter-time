@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: letter-time
+    runtime: static
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false

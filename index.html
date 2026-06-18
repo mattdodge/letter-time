@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Letter Time! ⭐</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+      background-size: 400% 400%;
+      animation: gradient-shift 12s ease infinite;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 16px 24px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    @keyframes gradient-shift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* ---- Header ---- */
+    header {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(1.5rem, 6vw, 2rem);
+      color: white;
+      text-shadow: 2px 3px 0 rgba(0,0,0,0.2);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #streak {
+      background: rgba(255,255,255,0.25);
+      border-radius: 20px;
+      padding: 5px 14px;
+      color: white;
+      font-weight: 900;
+      font-size: 0.95rem;
+    }
+
+    #stats-btn {
+      background: rgba(255,255,255,0.25);
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      font-size: 1.3rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, background 0.15s;
+    }
+    #stats-btn:active { transform: scale(0.88); background: rgba(255,255,255,0.4); }
+
+    /* ---- Card area ---- */
+    #card-area {
+      flex: 1;
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    #card {
+      width: min(270px, 78vw);
+      height: min(310px, 52vh);
+      background: white;
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.28);
+      position: absolute;
+      cursor: grab;
+      will-change: transform, opacity;
+      touch-action: none;
+    }
+
+    #card.snapping {
+      transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+    }
+    #card.flying {
+      transition: transform 0.3s ease-in, opacity 0.2s ease-in;
+    }
+    #card.entering {
+      transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.28s ease;
+    }
+
+    #letter-char {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(130px, 36vw, 190px);
+      line-height: 1;
+    }
+
+    /* Swipe hint labels on the card */
+    .hint {
+      position: absolute;
+      top: 16px;
+      padding: 5px 12px;
+      border-radius: 14px;
+      font-weight: 900;
+      font-size: 1rem;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #hint-yes { right: 14px; background: #4CAF50; color: white; }
+    #hint-no  { left: 14px;  background: #F44336; color: white; }
+
+    /* ---- Feedback pop message ---- */
+    #feedback-msg {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(2rem, 8vw, 3rem);
+      color: white;
+      text-shadow: 3px 4px 0 rgba(0,0,0,0.2);
+      pointer-events: none;
+      opacity: 0;
+      z-index: 300;
+      white-space: nowrap;
+    }
+    #feedback-msg.pop {
+      animation: msg-pop 0.85s ease forwards;
+    }
+    @keyframes msg-pop {
+      0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.5); }
+      25%  { opacity: 1;   transform: translate(-50%, -50%) scale(1.1); }
+      55%  { opacity: 1;   transform: translate(-50%, -50%) scale(1);   }
+      100% { opacity: 0;   transform: translate(-50%, -75%) scale(0.9); }
+    }
+
+    /* ---- Tip text ---- */
+    #tip {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.75);
+      text-align: center;
+      margin: 4px 0;
+      font-weight: 700;
+    }
+
+    /* ---- Control buttons ---- */
+    #controls {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      gap: 16px;
+    }
+
+    .ctrl-btn {
+      flex: 1;
+      height: 70px;
+      border: none;
+      border-radius: 22px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      transition: transform 0.12s, filter 0.12s;
+      -webkit-appearance: none;
+    }
+    .ctrl-btn:active {
+      transform: scale(0.93) translateY(2px);
+      filter: brightness(0.88);
+    }
+
+    #btn-no {
+      background: linear-gradient(160deg, #FF6B6B 0%, #EE5A24 100%);
+      box-shadow: 0 8px 24px rgba(238,90,36,0.45);
+    }
+    #btn-yes {
+      background: linear-gradient(160deg, #b8f584 0%, #3dc43d 100%);
+      box-shadow: 0 8px 24px rgba(61,196,61,0.45);
+    }
+
+    .ctrl-icon  { font-size: 1.7rem; line-height: 1; }
+    .ctrl-label {
+      font-size: 0.72rem;
+      font-weight: 900;
+      color: white;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* ---- Flash overlay ---- */
+    #flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 200;
+    }
+    #flash.correct { animation: flash-c 0.42s ease forwards; }
+    #flash.wrong   { animation: flash-w 0.42s ease forwards; }
+    @keyframes flash-c {
+      0%  { opacity: 0;    background: #4CAF50; }
+      20% { opacity: 0.35; }
+      100%{ opacity: 0; }
+    }
+    @keyframes flash-w {
+      0%  { opacity: 0;    background: #FF5722; }
+      20% { opacity: 0.25; }
+      100%{ opacity: 0; }
+    }
+
+    /* ---- Particles ---- */
+    .particle {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      pointer-events: none;
+      z-index: 999;
+      font-size: 1.7rem;
+      animation: p-burst var(--dur) ease-out var(--delay) both;
+    }
+    @keyframes p-burst {
+      0%   { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+      100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.1); opacity: 0; }
+    }
+
+    /* ---- Stats modal ---- */
+    #modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 600;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    #modal-overlay.open { display: flex; }
+
+    .modal {
+      background: white;
+      border-radius: 28px;
+      padding: 26px 22px 22px;
+      width: 100%;
+      max-width: 340px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+    }
+    .modal h2 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.7rem;
+      color: #333;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .modal-legend {
+      font-size: 0.78rem;
+      color: #888;
+      text-align: center;
+      margin-bottom: 14px;
+      font-weight: 700;
+    }
+
+    .letter-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .letter-tile {
+      background: #f6f6f6;
+      border-radius: 14px;
+      padding: 10px 4px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .tile-letter {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.8rem;
+      line-height: 1;
+    }
+    .tile-stars {
+      font-size: 0.65rem;
+      letter-spacing: -2px;
+    }
+
+    .modal-btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 18px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 1rem;
+      font-weight: 900;
+      cursor: pointer;
+      -webkit-appearance: none;
+      transition: transform 0.12s, filter 0.12s;
+    }
+    .modal-btn:active { transform: scale(0.97); filter: brightness(0.9); }
+    .modal-btn.primary {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      box-shadow: 0 4px 14px rgba(102,126,234,0.45);
+      margin-bottom: 10px;
+    }
+    .modal-btn.secondary {
+      background: transparent;
+      border: 2px solid #e0e0e0;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Letter Time! ⭐</h1>
+  <div class="header-right">
+    <div id="streak">⭐ 0</div>
+    <button id="stats-btn" onclick="openStats()" aria-label="Show progress">📊</button>
+  </div>
+</header>
+
+<div id="card-area">
+  <div id="card">
+    <span class="hint" id="hint-yes">✓ YES!</span>
+    <span class="hint" id="hint-no">✗ OOPS!</span>
+    <div id="letter-char"></div>
+  </div>
+</div>
+
+<div id="feedback-msg"></div>
+
+<p id="tip">← not yet &nbsp;|&nbsp; swipe or tap &nbsp;|&nbsp; got it! →</p>
+
+<div id="controls">
+  <button class="ctrl-btn" id="btn-no"  onclick="respond(false)">
+    <div class="ctrl-icon">❌</div>
+    <div class="ctrl-label">Not Yet</div>
+  </button>
+  <button class="ctrl-btn" id="btn-yes" onclick="respond(true)">
+    <div class="ctrl-icon">⭐</div>
+    <div class="ctrl-label">Got It!</div>
+  </button>
+</div>
+
+<div id="flash"></div>
+
+<div id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <h2>How We're Doing! 🌈</h2>
+    <p class="modal-legend">🌟🌟🌟 = knows it &nbsp; 💪 = needs practice</p>
+    <div class="letter-grid" id="letter-grid"></div>
+    <button class="modal-btn primary" onclick="closeStats()">Keep Going! 🚀</button>
+    <button class="modal-btn secondary" onclick="resetStats()">Start Fresh</button>
+  </div>
+</div>
+
+<script>
+  const LETTERS = ['E', 'T', 'A', 'O', 'I', 'N', 'S', 'H', 'R', 'L', 'D', 'C', 'U'];
+
+  const COLORS = {
+    E:'#FF6B6B', T:'#FF9A3C', A:'#f9ca24', O:'#4ECDC4',
+    I:'#45B7D1', N:'#a29bfe', S:'#fd79a8', H:'#55efc4',
+    R:'#e17055', L:'#74b9ff', D:'#fdcb6e', C:'#6c5ce7', U:'#00cec9'
+  };
+
+  const CORRECT_MSGS = ['Amazing! 🌟', 'Great Job! ⭐', 'Woohoo! 🎉', 'You Rock! 🏆', 'Yes!! 💫', 'Awesome! 🎈', 'Brilliant! ✨'];
+  const WRONG_MSGS   = ['Almost! 💪', 'Keep Going! 📚', "You've Got This! 🌈", 'Try Again! 🔥'];
+
+  let weights = loadWeights();
+  let streak  = 0;
+  let current = '';
+  let busy    = false;
+
+  function loadWeights() {
+    try {
+      const s = localStorage.getItem('lt_weights_v1');
+      if (s) return JSON.parse(s);
+    } catch(_) {}
+    const w = {};
+    LETTERS.forEach(l => w[l] = 1);
+    return w;
+  }
+
+  function saveWeights() {
+    localStorage.setItem('lt_weights_v1', JSON.stringify(weights));
+  }
+
+  function pickNext() {
+    // Weighted random selection, excluding the letter just shown
+    const pool  = LETTERS.filter(l => l !== current);
+    const total = pool.reduce((s, l) => s + weights[l], 0);
+    let r = Math.random() * total;
+    for (const l of pool) {
+      r -= weights[l];
+      if (r <= 0) return l;
+    }
+    return pool[pool.length - 1];
+  }
+
+  // ---- Card display ----
+
+  function showCard(letter, slideFrom = 0) {
+    current = letter;
+    const card  = document.getElementById('card');
+    const label = document.getElementById('letter-char');
+    const color = COLORS[letter];
+
+    label.textContent = letter;
+    label.style.color = color;
+    card.style.boxShadow = `0 24px 80px ${color}55`;
+
+    if (slideFrom !== 0) {
+      card.className = '';
+      card.style.transform = `translateX(${slideFrom * 115}%) rotate(${slideFrom * 8}deg)`;
+      card.style.opacity   = '0';
+      void card.offsetWidth; // force reflow
+      card.className       = 'entering';
+      card.style.transform = 'translateX(0) rotate(0deg)';
+      card.style.opacity   = '1';
+    } else {
+      card.style.transform = 'translateX(0) rotate(0deg)';
+      card.style.opacity   = '1';
+    }
+  }
+
+  function flyCard(dir) {
+    const card = document.getElementById('card');
+    card.className       = 'flying';
+    card.style.transform = `translateX(${dir * 125}%) rotate(${dir * 18}deg)`;
+    card.style.opacity   = '0';
+  }
+
+  function showFeedback(correct) {
+    const el   = document.getElementById('feedback-msg');
+    const msgs = correct ? CORRECT_MSGS : WRONG_MSGS;
+    el.textContent = msgs[Math.floor(Math.random() * msgs.length)];
+    el.className   = '';
+    void el.offsetWidth;
+    el.className   = 'pop';
+  }
+
+  function triggerFlash(correct) {
+    const el = document.getElementById('flash');
+    el.className = '';
+    void el.offsetWidth;
+    el.className = correct ? 'correct' : 'wrong';
+  }
+
+  function burst(correct) {
+    const emojis = correct
+      ? ['⭐', '✨', '🌟', '💫', '🎉', '🏆', '🎈']
+      : ['💪', '📚', '🌈', '🔥'];
+    const count = correct ? 16 : 6;
+    for (let i = 0; i < count; i++) {
+      const el    = document.createElement('div');
+      el.className = 'particle';
+      el.textContent = emojis[i % emojis.length];
+      const angle  = Math.random() * 2 * Math.PI;
+      const dist   = 80 + Math.random() * 140;
+      el.style.setProperty('--dx',    `${Math.cos(angle) * dist}px`);
+      el.style.setProperty('--dy',    `${Math.sin(angle) * dist}px`);
+      el.style.setProperty('--dur',   `${0.5 + Math.random() * 0.4}s`);
+      el.style.setProperty('--delay', `${Math.random() * 0.07}s`);
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1200);
+    }
+  }
+
+  // ---- Respond to correct / wrong ----
+
+  function respond(correct) {
+    if (busy) return;
+    busy = true;
+
+    if (correct) {
+      streak++;
+      weights[current] = Math.max(1, weights[current] - 1);
+    } else {
+      streak = 0;
+      // Add weight so this letter appears more often; cap at 10
+      weights[current] = Math.min(10, weights[current] + 3);
+    }
+    saveWeights();
+    document.getElementById('streak').textContent = `⭐ ${streak}`;
+
+    triggerFlash(correct);
+    showFeedback(correct);
+    burst(correct);
+    flyCard(correct ? 1 : -1);
+
+    setTimeout(() => {
+      showCard(pickNext(), correct ? -1 : 1);
+      setTimeout(() => { busy = false; }, 460);
+    }, 320);
+  }
+
+  // ---- Swipe / drag ----
+
+  const card = document.getElementById('card');
+  let drag = { active: false, startX: 0, startY: 0, dx: 0, axis: null };
+
+  function dragStart(x, y) {
+    if (busy) return;
+    drag = { active: true, startX: x, startY: y, dx: 0, axis: null };
+    card.className      = '';
+    card.style.transition = 'none';
+  }
+
+  function dragMove(x, y) {
+    if (!drag.active || busy) return;
+    const dx = x - drag.startX;
+    const dy = y - drag.startY;
+
+    if (!drag.axis) {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8)
+        drag.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    if (drag.axis !== 'x') return;
+
+    drag.dx = dx;
+    card.style.transform = `translateX(${dx}px) rotate(${dx * 0.07}deg)`;
+
+    const t = 80;
+    document.getElementById('hint-yes').style.opacity = dx > 0 ? Math.min(1, (dx  - 20) / t) : 0;
+    document.getElementById('hint-no') .style.opacity = dx < 0 ? Math.min(1, (-dx - 20) / t) : 0;
+  }
+
+  function dragEnd() {
+    if (!drag.active) return;
+    drag.active = false;
+    document.getElementById('hint-yes').style.opacity = 0;
+    document.getElementById('hint-no') .style.opacity = 0;
+
+    if (drag.axis !== 'x') return;
+
+    if      (drag.dx >  90) respond(true);
+    else if (drag.dx < -90) respond(false);
+    else {
+      card.className       = 'snapping';
+      card.style.transform = 'translateX(0) rotate(0deg)';
+    }
+  }
+
+  // Touch events
+  card.addEventListener('touchstart', e => dragStart(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  card.addEventListener('touchmove',  e => {
+    dragMove(e.touches[0].clientX, e.touches[0].clientY);
+    if (drag.axis === 'x') e.preventDefault();
+  }, { passive: false });
+  card.addEventListener('touchend',    dragEnd);
+  card.addEventListener('touchcancel', dragEnd);
+
+  // Mouse events (desktop)
+  card.addEventListener('mousedown', e => dragStart(e.clientX, e.clientY));
+  document.addEventListener('mousemove', e => dragMove(e.clientX, e.clientY));
+  document.addEventListener('mouseup',   dragEnd);
+
+  // Keyboard (for desktop/tablet use)
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ')         { e.preventDefault(); respond(true);  }
+    if (e.key === 'ArrowLeft'  || e.key === 'Backspace') { e.preventDefault(); respond(false); }
+  });
+
+  // ---- Stats modal ----
+
+  function openStats() {
+    const grid = document.getElementById('letter-grid');
+    grid.innerHTML = LETTERS.map(l => {
+      const w     = weights[l];
+      const stars = w <= 1 ? '🌟🌟🌟' : w <= 4 ? '🌟🌟' : w <= 7 ? '🌟' : '💪';
+      return `<div class="letter-tile">
+        <div class="tile-letter" style="color:${COLORS[l]}">${l}</div>
+        <div class="tile-stars">${stars}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('modal-overlay').classList.add('open');
+  }
+
+  function closeStats() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById('modal-overlay')) closeStats();
+  }
+
+  function resetStats() {
+    if (!confirm('Reset all progress and start fresh?')) return;
+    LETTERS.forEach(l => weights[l] = 1);
+    streak = 0;
+    document.getElementById('streak').textContent = '⭐ 0';
+    saveWeights();
+    closeStats();
+  }
+
+  // ---- Init ----
+  showCard(pickNext());
+</script>
+</body>
+</html>
