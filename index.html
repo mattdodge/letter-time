@@ -85,6 +85,38 @@
     }
     #stats-btn:active { transform: scale(0.88); background: rgba(255,255,255,0.4); }
 
+    /* ---- Mode tabs ---- */
+    #mode-tabs {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      gap: 6px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 18px;
+      padding: 5px;
+      margin-top: 12px;
+    }
+    .tab-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 10px 6px;
+      border-radius: 14px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.85);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, transform 0.12s;
+      -webkit-appearance: none;
+    }
+    .tab-btn.active {
+      background: white;
+      color: #333;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    }
+    .tab-btn:active { transform: scale(0.96); }
+
     /* ---- Card area ---- */
     #card-area {
       flex: 1;
@@ -125,6 +157,9 @@
       font-family: 'Fredoka One', cursive;
       font-size: clamp(130px, 36vw, 190px);
       line-height: 1;
+    }
+    #letter-char.math-mode {
+      font-size: clamp(55px, 16vw, 92px);
     }
 
     /* Swipe hint labels on the card */
@@ -314,6 +349,11 @@
       font-size: 1.8rem;
       line-height: 1;
     }
+    .tile-letter.small {
+      font-size: 0.85rem;
+      text-align: center;
+      line-height: 1.2;
+    }
     .tile-stars {
       font-size: 0.65rem;
       letter-spacing: -2px;
@@ -354,6 +394,11 @@
     <button id="stats-btn" onclick="openStats()" aria-label="Show progress">📊</button>
   </div>
 </header>
+
+<div id="mode-tabs">
+  <button class="tab-btn" id="tab-letters" onclick="switchMode('letters')">🔤 Letters</button>
+  <button class="tab-btn" id="tab-math" onclick="switchMode('math')">➕ Math</button>
+</div>
 
 <div id="card-area">
   <div id="card">
@@ -404,46 +449,143 @@
   const CORRECT_MSGS = ['Amazing! 🌟', 'Great Job! ⭐', 'Woohoo! 🎉', 'You Rock! 🏆', 'Yes!! 💫', 'Awesome! 🎈', 'Brilliant! ✨'];
   const WRONG_MSGS   = ['Almost! 💪', 'Keep Going! 📚', "You've Got This! 🌈", 'Try Again! 🔥'];
 
-  let weights = loadWeights();
+  // ---- Math problem categories ----
+  // Instead of tracking exact problems, we track weights per *category* of
+  // problem (skill type). A missed problem makes that whole category show up
+  // more often (with freshly-random numbers each time), which reinforces the
+  // underlying skill instead of just memorizing one fact.
+  function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+  const MATH_CATEGORIES = [
+    {
+      id: 'plus1minus1', label: '+1 / -1', color: '#FF6B6B',
+      gen() {
+        return Math.random() < 0.5
+          ? { a: randInt(0, 18), b: 1, op: '+' }
+          : { a: randInt(1, 19), b: 1, op: '-' };
+      }
+    },
+    {
+      id: 'doubles', label: 'Doubles', color: '#4ECDC4',
+      gen() {
+        const n = randInt(1, 9);
+        return Math.random() < 0.5
+          ? { a: n, b: n, op: '+' }
+          : { a: n * 2, b: n, op: '-' };
+      }
+    },
+    {
+      id: 'makeTen', label: 'Make 10', color: '#f9ca24',
+      gen() {
+        const n = randInt(1, 9);
+        return Math.random() < 0.5
+          ? { a: n, b: 10 - n, op: '+' }
+          : { a: 10, b: n, op: '-' };
+      }
+    },
+    {
+      id: 'teens', label: 'Teen Numbers', color: '#a29bfe',
+      gen() {
+        if (Math.random() < 0.5) {
+          let a, b;
+          do { a = randInt(3, 9); b = randInt(3, 9); } while (a + b < 11 || a + b > 19);
+          return { a, b, op: '+' };
+        }
+        const a = randInt(11, 19);
+        const b = randInt(2, Math.min(9, a - 2));
+        return { a, b, op: '-' };
+      }
+    },
+    {
+      id: 'smallFacts', label: 'Small Numbers', color: '#55efc4',
+      gen() {
+        let a = randInt(0, 5), b = randInt(0, 5);
+        const op = Math.random() < 0.5 ? '+' : '-';
+        if (op === '-' && b > a) [a, b] = [b, a];
+        return { a, b, op };
+      }
+    },
+    {
+      id: 'general', label: 'Mixed Practice', color: '#74b9ff',
+      gen() {
+        const op = Math.random() < 0.5 ? '+' : '-';
+        if (op === '+') {
+          const a = randInt(0, 19);
+          return { a, b: randInt(0, 19 - a), op };
+        }
+        let a = randInt(0, 19), b = randInt(0, 19);
+        if (b > a) [a, b] = [b, a];
+        return { a, b, op };
+      }
+    }
+  ];
+
+  let mode        = localStorage.getItem('lt_mode') || 'letters';
+  let letterWeights = loadWeights('lt_weights_v1', LETTERS);
+  let mathWeights    = loadWeights('lt_math_weights_v1', MATH_CATEGORIES.map(c => c.id));
   let streak  = 0;
-  let current = '';
+  let current = null; // { key, display, color }
   let busy    = false;
 
-  function loadWeights() {
+  function loadWeights(storageKey, keys) {
     try {
-      const s = localStorage.getItem('lt_weights_v1');
+      const s = localStorage.getItem(storageKey);
       if (s) return JSON.parse(s);
     } catch(_) {}
     const w = {};
-    LETTERS.forEach(l => w[l] = 1);
+    keys.forEach(k => w[k] = 1);
     return w;
   }
 
   function saveWeights() {
-    localStorage.setItem('lt_weights_v1', JSON.stringify(weights));
+    localStorage.setItem('lt_weights_v1', JSON.stringify(letterWeights));
+    localStorage.setItem('lt_math_weights_v1', JSON.stringify(mathWeights));
   }
 
-  function pickNext() {
-    // Weighted random selection, excluding the letter just shown
-    const pool  = LETTERS.filter(l => l !== current);
-    const total = pool.reduce((s, l) => s + weights[l], 0);
+  function weightedPick(keys, weights, exclude) {
+    const pool  = keys.filter(k => k !== exclude);
+    const total = pool.reduce((s, k) => s + weights[k], 0);
     let r = Math.random() * total;
-    for (const l of pool) {
-      r -= weights[l];
-      if (r <= 0) return l;
+    for (const k of pool) {
+      r -= weights[k];
+      if (r <= 0) return k;
     }
     return pool[pool.length - 1];
   }
 
+  function pickNext() {
+    if (mode === 'letters') {
+      const l = weightedPick(LETTERS, letterWeights, current && current.key);
+      return { key: l, display: l, color: COLORS[l] };
+    }
+    const catId = weightedPick(MATH_CATEGORIES.map(c => c.id), mathWeights, current && current.key);
+    const cat = MATH_CATEGORIES.find(c => c.id === catId);
+    const { a, b, op } = cat.gen();
+    return { key: cat.id, display: `${a} ${op} ${b}`, color: cat.color };
+  }
+
+  // ---- Mode switching ----
+
+  function switchMode(newMode) {
+    if (newMode === mode || busy) return;
+    mode = newMode;
+    localStorage.setItem('lt_mode', mode);
+    document.getElementById('tab-letters').classList.toggle('active', mode === 'letters');
+    document.getElementById('tab-math').classList.toggle('active', mode === 'math');
+    document.getElementById('letter-char').classList.toggle('math-mode', mode === 'math');
+    current = null;
+    showCard(pickNext());
+  }
+
   // ---- Card display ----
 
-  function showCard(letter, slideFrom = 0) {
-    current = letter;
+  function showCard(item, slideFrom = 0) {
+    current = item;
     const card  = document.getElementById('card');
     const label = document.getElementById('letter-char');
-    const color = COLORS[letter];
+    const color = item.color;
 
-    label.textContent = letter;
+    label.textContent = item.display;
     label.style.color = color;
     card.style.boxShadow = `0 24px 80px ${color}55`;
 
@@ -510,13 +652,16 @@
     if (busy) return;
     busy = true;
 
+    const weights = mode === 'letters' ? letterWeights : mathWeights;
+    const key     = current.key;
+
     if (correct) {
       streak++;
-      weights[current] = Math.max(1, weights[current] - 1);
+      weights[key] = Math.max(1, weights[key] - 1);
     } else {
       streak = 0;
-      // Add weight so this letter appears more often; cap at 10
-      weights[current] = Math.min(10, weights[current] + 3);
+      // Add weight so this letter/category appears more often; cap at 10
+      weights[key] = Math.min(10, weights[key] + 3);
     }
     saveWeights();
     document.getElementById('streak').textContent = `⭐ ${streak}`;
@@ -601,16 +746,23 @@
 
   // ---- Stats modal ----
 
+  function starsFor(w) {
+    return w <= 1 ? '🌟🌟🌟' : w <= 4 ? '🌟🌟' : w <= 7 ? '🌟' : '💪';
+  }
+
   function openStats() {
     const grid = document.getElementById('letter-grid');
-    grid.innerHTML = LETTERS.map(l => {
-      const w     = weights[l];
-      const stars = w <= 1 ? '🌟🌟🌟' : w <= 4 ? '🌟🌟' : w <= 7 ? '🌟' : '💪';
-      return `<div class="letter-tile">
+    if (mode === 'letters') {
+      grid.innerHTML = LETTERS.map(l => `<div class="letter-tile">
         <div class="tile-letter" style="color:${COLORS[l]}">${l}</div>
-        <div class="tile-stars">${stars}</div>
-      </div>`;
-    }).join('');
+        <div class="tile-stars">${starsFor(letterWeights[l])}</div>
+      </div>`).join('');
+    } else {
+      grid.innerHTML = MATH_CATEGORIES.map(c => `<div class="letter-tile">
+        <div class="tile-letter small" style="color:${c.color}">${c.label}</div>
+        <div class="tile-stars">${starsFor(mathWeights[c.id])}</div>
+      </div>`).join('');
+    }
     document.getElementById('modal-overlay').classList.add('open');
   }
 
@@ -624,7 +776,11 @@
 
   function resetStats() {
     if (!confirm('Reset all progress and start fresh?')) return;
-    LETTERS.forEach(l => weights[l] = 1);
+    if (mode === 'letters') {
+      LETTERS.forEach(l => letterWeights[l] = 1);
+    } else {
+      MATH_CATEGORIES.forEach(c => mathWeights[c.id] = 1);
+    }
     streak = 0;
     document.getElementById('streak').textContent = '⭐ 0';
     saveWeights();
@@ -632,6 +788,9 @@
   }
 
   // ---- Init ----
+  document.getElementById('tab-letters').classList.toggle('active', mode === 'letters');
+  document.getElementById('tab-math').classList.toggle('active', mode === 'math');
+  document.getElementById('letter-char').classList.toggle('math-mode', mode === 'math');
   showCard(pickNext());
 </script>
 </body>
