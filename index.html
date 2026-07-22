@@ -802,9 +802,9 @@
     }
     disarmReset();
     if (mode === 'letters') {
-      LETTERS.forEach(l => letterWeights[l] = 1);
+      LETTERS.forEach(l => letterWeights[l] = 10);
     } else {
-      MATH_CATEGORIES.forEach(c => mathWeights[c.id] = 1);
+      MATH_CATEGORIES.forEach(c => mathWeights[c.id] = 10);
     }
     streak = 0;
     document.getElementById('streak').textContent = '⭐ 0';
