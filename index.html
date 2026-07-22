@@ -528,12 +528,12 @@
   let busy    = false;
 
   function loadWeights(storageKey, keys) {
+    let w = {};
     try {
       const s = localStorage.getItem(storageKey);
-      if (s) return JSON.parse(s);
+      if (s) w = JSON.parse(s);
     } catch(_) {}
-    const w = {};
-    keys.forEach(k => w[k] = 1);
+    keys.forEach(k => { if (!(k in w)) w[k] = 1; });
     return w;
   }
 
