@@ -383,6 +383,10 @@
       border: 2px solid #e0e0e0;
       color: #aaa;
     }
+    .modal-btn.secondary.confirm-armed {
+      border-color: #F44336;
+      color: #F44336;
+    }
   </style>
 </head>
 <body>
@@ -431,7 +435,7 @@
     <p class="modal-legend">🌟🌟🌟 = knows it &nbsp; 💪 = needs practice</p>
     <div class="letter-grid" id="letter-grid"></div>
     <button class="modal-btn primary" onclick="closeStats()">Keep Going! 🚀</button>
-    <button class="modal-btn secondary" onclick="resetStats()">Start Fresh</button>
+    <button class="modal-btn secondary" id="reset-btn" onclick="resetStats()">Start Fresh</button>
   </div>
 </div>
 
@@ -768,14 +772,35 @@
 
   function closeStats() {
     document.getElementById('modal-overlay').classList.remove('open');
+    disarmReset();
   }
 
   function handleOverlayClick(e) {
     if (e.target === document.getElementById('modal-overlay')) closeStats();
   }
 
+  let resetArmed = false;
+  let resetArmTimer = null;
+
+  function disarmReset() {
+    resetArmed = false;
+    clearTimeout(resetArmTimer);
+    const btn = document.getElementById('reset-btn');
+    btn.textContent = 'Start Fresh';
+    btn.classList.remove('confirm-armed');
+  }
+
   function resetStats() {
-    if (!confirm('Reset all progress and start fresh?')) return;
+    const btn = document.getElementById('reset-btn');
+    if (!resetArmed) {
+      resetArmed = true;
+      btn.textContent = 'Tap again to confirm';
+      btn.classList.add('confirm-armed');
+      clearTimeout(resetArmTimer);
+      resetArmTimer = setTimeout(disarmReset, 3000);
+      return;
+    }
+    disarmReset();
     if (mode === 'letters') {
       LETTERS.forEach(l => letterWeights[l] = 1);
     } else {
