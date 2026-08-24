@@ -570,7 +570,8 @@
   function pickNext() {
     if (mode === 'letters') {
       const l = weightedPick(LETTERS, letterWeights, current && current.key);
-      return { key: l, display: l, color: COLORS[l] };
+      const display = Math.random() < 0.5 ? l.toLowerCase() : l;
+      return { key: l, display, color: COLORS[l] };
     }
     const catId = weightedPick(MATH_CATEGORIES.map(c => c.id), mathWeights, current && current.key);
     const cat = MATH_CATEGORIES.find(c => c.id === catId);
