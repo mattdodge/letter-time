@@ -159,7 +159,62 @@
       line-height: 1;
     }
     #letter-char.math-mode {
-      font-size: clamp(55px, 16vw, 92px);
+      width: 100%;
+      font-size: 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .number-bond {
+      width: min(220px, 68vw);
+      height: 220px;
+      position: relative;
+    }
+    .bond-number {
+      position: absolute;
+      z-index: 2;
+      width: 82px;
+      height: 82px;
+      border: 5px solid currentColor;
+      border-radius: 50%;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Fredoka One', cursive;
+      font-size: 3rem;
+      line-height: 1;
+    }
+    .bond-number.missing {
+      border-style: dashed;
+      background: #fffbea;
+      color: #f1b500;
+    }
+    .bond-total {
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .bond-part-left { left: 2px; bottom: 0; }
+    .bond-part-right { right: 2px; bottom: 0; }
+    .bond-line {
+      position: absolute;
+      z-index: 1;
+      top: 67px;
+      width: 5px;
+      height: 92px;
+      border-radius: 5px;
+      background: currentColor;
+      transform-origin: top center;
+      opacity: 0.55;
+    }
+    .bond-line-left {
+      left: calc(50% - 2px);
+      transform: rotate(42deg);
+    }
+    .bond-line-right {
+      right: calc(50% - 2px);
+      transform: rotate(-42deg);
     }
 
     /* Swipe hint labels on the card */
@@ -342,6 +397,9 @@
       flex-shrink: 1;
       min-height: 0;
     }
+    .letter-grid.math-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
 
     .letter-tile {
       background: #f6f6f6;
@@ -361,6 +419,16 @@
       font-size: 0.85rem;
       text-align: center;
       line-height: 1.2;
+    }
+    .tile-bond-total {
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.35rem;
+      line-height: 1;
+    }
+    .tile-bond-parts {
+      font-size: 0.72rem;
+      line-height: 1;
+      white-space: nowrap;
     }
     .tile-stars {
       font-size: 0.65rem;
@@ -463,97 +531,48 @@
   const CORRECT_MSGS = ['Amazing! 🌟', 'Great Job! ⭐', 'Woohoo! 🎉', 'You Rock! 🏆', 'Yes!! 💫', 'Awesome! 🎈', 'Brilliant! ✨'];
   const WRONG_MSGS   = ['Almost! 💪', 'Keep Going! 📚', "You've Got This! 🌈", 'Try Again! 🔥'];
 
-  // ---- Math problem categories ----
-  // Instead of tracking exact problems, we track weights per *category* of
-  // problem (skill type). A missed problem makes that whole category show up
-  // more often (with freshly-random numbers each time), which reinforces the
-  // underlying skill instead of just memorizing one fact.
+  // ---- Number bonds ----
+  // Each bond is stored canonically as [total, smallerPart, largerPart], so
+  // commutative duplicates such as 3 + 7 and 7 + 3 share the same stats.
   function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
-  const MATH_CATEGORIES = [
-    {
-      id: 'plus1minus1', label: '+1 / -1', color: '#FF6B6B',
-      gen() {
-        return Math.random() < 0.5
-          ? { a: randInt(0, 18), b: 1, op: '+' }
-          : { a: randInt(1, 19), b: 1, op: '-' };
-      }
-    },
-    {
-      id: 'doubles', label: 'Doubles', color: '#4ECDC4',
-      gen() {
-        const n = randInt(1, 9);
-        return Math.random() < 0.5
-          ? { a: n, b: n, op: '+' }
-          : { a: n * 2, b: n, op: '-' };
-      }
-    },
-    {
-      id: 'makeTen', label: 'Make 10', color: '#f9ca24',
-      gen() {
-        const n = randInt(1, 9);
-        return Math.random() < 0.5
-          ? { a: n, b: 10 - n, op: '+' }
-          : { a: 10, b: n, op: '-' };
-      }
-    },
-    {
-      id: 'teens', label: 'Teen Numbers', color: '#a29bfe',
-      gen() {
-        if (Math.random() < 0.5) {
-          let a, b;
-          do { a = randInt(3, 9); b = randInt(3, 9); } while (a + b < 11 || a + b > 19);
-          return { a, b, op: '+' };
-        }
-        const a = randInt(11, 19);
-        const b = randInt(2, Math.min(9, a - 2));
-        return { a, b, op: '-' };
-      }
-    },
-    {
-      id: 'smallFacts', label: 'Small Numbers', color: '#55efc4',
-      gen() {
-        let a = randInt(0, 5), b = randInt(0, 5);
-        const op = Math.random() < 0.5 ? '+' : '-';
-        if (op === '-' && b > a) [a, b] = [b, a];
-        return { a, b, op };
-      }
-    },
-    {
-      id: 'general', label: 'Mixed Practice', color: '#74b9ff',
-      gen() {
-        const op = Math.random() < 0.5 ? '+' : '-';
-        if (op === '+') {
-          const a = randInt(0, 19);
-          return { a, b: randInt(0, 19 - a), op };
-        }
-        let a = randInt(0, 19), b = randInt(0, 19);
-        if (b > a) [a, b] = [b, a];
-        return { a, b, op };
-      }
+  const BOND_COLORS = ['#FF6B6B', '#FF9A3C', '#e3b600', '#4ECDC4', '#45B7D1', '#6c5ce7', '#e84393'];
+  const NUMBER_BONDS = [];
+  for (let left = 1; left <= 9; left++) {
+    for (let right = left; right <= 9; right++) {
+      const total = left + right;
+      NUMBER_BONDS.push({
+        tuple: [total, left, right],
+        key: JSON.stringify([total, left, right]),
+        total,
+        left,
+        right,
+        color: BOND_COLORS[(total - 2) % BOND_COLORS.length]
+      });
     }
-  ];
+  }
+  const NUMBER_BONDS_BY_KEY = Object.fromEntries(NUMBER_BONDS.map(bond => [bond.key, bond]));
 
   let mode        = localStorage.getItem('lt_mode') || 'letters';
   let letterWeights = loadWeights('lt_weights_v1', LETTERS);
-  let mathWeights    = loadWeights('lt_math_weights_v1', MATH_CATEGORIES.map(c => c.id));
+  let mathWeights    = loadWeights('lt_number_bond_weights_v1', NUMBER_BONDS.map(bond => bond.key), 10);
   let streak  = 0;
-  let current = null; // { key, display, color }
+  let current = null; // letter item or { key, bond, missingIndex, color }
   let busy    = false;
 
-  function loadWeights(storageKey, keys) {
+  function loadWeights(storageKey, keys, initialWeight = 1) {
     let w = {};
     try {
       const s = localStorage.getItem(storageKey);
       if (s) w = JSON.parse(s);
     } catch(_) {}
-    keys.forEach(k => { if (!(k in w)) w[k] = 1; });
+    keys.forEach(k => { if (!(k in w)) w[k] = initialWeight; });
     return w;
   }
 
   function saveWeights() {
     localStorage.setItem('lt_weights_v1', JSON.stringify(letterWeights));
-    localStorage.setItem('lt_math_weights_v1', JSON.stringify(mathWeights));
+    localStorage.setItem('lt_number_bond_weights_v1', JSON.stringify(mathWeights));
   }
 
   function weightedPick(keys, weights, exclude) {
@@ -573,10 +592,9 @@
       const display = Math.random() < 0.5 ? l.toLowerCase() : l;
       return { key: l, display, color: COLORS[l] };
     }
-    const catId = weightedPick(MATH_CATEGORIES.map(c => c.id), mathWeights, current && current.key);
-    const cat = MATH_CATEGORIES.find(c => c.id === catId);
-    const { a, b, op } = cat.gen();
-    return { key: cat.id, display: `${a} ${op} ${b}`, color: cat.color };
+    const key = weightedPick(NUMBER_BONDS.map(bond => bond.key), mathWeights, current && current.key);
+    const bond = NUMBER_BONDS_BY_KEY[key];
+    return { key, bond, missingIndex: randInt(0, 2), color: bond.color };
   }
 
   // ---- Mode switching ----
@@ -594,13 +612,29 @@
 
   // ---- Card display ----
 
+  function numberBondMarkup(item) {
+    const values = item.bond.tuple.map((value, index) => index === item.missingIndex ? '' : value);
+    const missingClass = index => index === item.missingIndex ? ' missing' : '';
+    return `<div class="number-bond" role="img" aria-label="Number bond with one missing number">
+      <div class="bond-line bond-line-left"></div>
+      <div class="bond-line bond-line-right"></div>
+      <div class="bond-number bond-total${missingClass(0)}">${values[0]}</div>
+      <div class="bond-number bond-part-left${missingClass(1)}">${values[1]}</div>
+      <div class="bond-number bond-part-right${missingClass(2)}">${values[2]}</div>
+    </div>`;
+  }
+
   function showCard(item, slideFrom = 0) {
     current = item;
     const card  = document.getElementById('card');
     const label = document.getElementById('letter-char');
     const color = item.color;
 
-    label.textContent = item.display;
+    if (item.bond) {
+      label.innerHTML = numberBondMarkup(item);
+    } else {
+      label.textContent = item.display;
+    }
     label.style.color = color;
     card.style.boxShadow = `0 24px 80px ${color}55`;
 
@@ -675,7 +709,7 @@
       weights[key] = Math.max(1, weights[key] - 1);
     } else {
       streak = 0;
-      // Add weight so this letter/category appears more often; cap at 10
+      // Add weight so this letter or number bond appears more often; cap at 10
       weights[key] = Math.min(10, weights[key] + 3);
     }
     saveWeights();
@@ -767,15 +801,17 @@
 
   function openStats() {
     const grid = document.getElementById('letter-grid');
+    grid.classList.toggle('math-grid', mode === 'math');
     if (mode === 'letters') {
       grid.innerHTML = LETTERS.map(l => `<div class="letter-tile">
         <div class="tile-letter" style="color:${COLORS[l]}">${l}</div>
         <div class="tile-stars">${starsFor(letterWeights[l])}</div>
       </div>`).join('');
     } else {
-      grid.innerHTML = MATH_CATEGORIES.map(c => `<div class="letter-tile">
-        <div class="tile-letter small" style="color:${c.color}">${c.label}</div>
-        <div class="tile-stars">${starsFor(mathWeights[c.id])}</div>
+      grid.innerHTML = NUMBER_BONDS.map(bond => `<div class="letter-tile" title="${bond.key}">
+        <div class="tile-bond-total" style="color:${bond.color}">${bond.total}</div>
+        <div class="tile-bond-parts" style="color:${bond.color}">${bond.left} + ${bond.right}</div>
+        <div class="tile-stars">${starsFor(mathWeights[bond.key])}</div>
       </div>`).join('');
     }
     document.getElementById('modal-overlay').classList.add('open');
@@ -815,7 +851,7 @@
     if (mode === 'letters') {
       LETTERS.forEach(l => letterWeights[l] = 10);
     } else {
-      MATH_CATEGORIES.forEach(c => mathWeights[c.id] = 10);
+      NUMBER_BONDS.forEach(bond => mathWeights[bond.key] = 10);
     }
     streak = 0;
     document.getElementById('streak').textContent = '⭐ 0';
