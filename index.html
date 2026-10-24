@@ -531,6 +531,46 @@
       box-shadow: 0 8px 30px rgba(0,0,0,0.35);
     }
     #exam-result-btn:active { transform: scale(0.95); filter: brightness(0.9); }
+
+    /* ---- Final Exam launch button ---- */
+    #start-exam-btn {
+      width: 100%;
+      max-width: 380px;
+      border: none;
+      border-radius: 18px;
+      padding: 12px 20px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 900;
+      font-size: 0.95rem;
+      color: white;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      box-shadow: 0 6px 20px rgba(102,126,234,0.45);
+      cursor: pointer;
+      -webkit-appearance: none;
+      transition: transform 0.12s, filter 0.12s;
+      margin-top: 8px;
+    }
+    #start-exam-btn:active { transform: scale(0.96); filter: brightness(0.88); }
+
+    /* ---- Exam timer ---- */
+    #exam-timer {
+      display: none;
+      background: rgba(255,255,255,0.25);
+      border-radius: 16px;
+      padding: 4px 14px;
+      color: white;
+      font-weight: 900;
+      font-size: 0.9rem;
+    }
+    #exam-timer.visible { display: block; }
+    #exam-timer.urgent {
+      background: rgba(255,60,60,0.55);
+      animation: timer-pulse 0.5s ease infinite alternate;
+    }
+    @keyframes timer-pulse {
+      from { opacity: 1; }
+      to   { opacity: 0.6; }
+    }
   </style>
 </head>
 <body>
@@ -546,11 +586,12 @@
 <div id="mode-tabs">
   <button class="tab-btn" id="tab-letters" onclick="switchMode('letters')">🔤 Letters</button>
   <button class="tab-btn" id="tab-math" onclick="switchMode('math')">➕ Math</button>
-  <button class="tab-btn" id="tab-exam" onclick="switchMode('exam')">🎓 Final Exam</button>
 </div>
+<button id="start-exam-btn" onclick="startExam()">🎓 Start Final Exam</button>
 
 <div id="exam-hud">
   <div id="exam-lives"></div>
+  <div id="exam-timer"></div>
   <div id="exam-progress"></div>
 </div>
 
@@ -680,14 +721,12 @@
 
   function switchMode(newMode) {
     if (busy) return;
-    if (newMode === 'exam') { startExam(); return; }
     if (examMode) { exitExam(); return; }
     if (newMode === mode) return;
     mode = newMode;
     localStorage.setItem('lt_mode', mode);
     document.getElementById('tab-letters').classList.toggle('active', mode === 'letters');
     document.getElementById('tab-math').classList.toggle('active', mode === 'math');
-    document.getElementById('tab-exam').classList.remove('active');
     document.getElementById('letter-char').classList.toggle('math-mode', mode === 'math');
     current = null;
     showCard(pickNext());
@@ -944,10 +983,13 @@
 
   // ---- Final Exam mode ----
 
-  let examMode = false;
-  let examDeck = [];
+  let examMode  = false;
+  let examKind  = 'letters'; // 'letters' | 'math'
+  let examDeck  = [];
   let examIndex = 0;
   let examLives = 3;
+  let examTimerId  = null;
+  let examTimeLeft = 0;
 
   function shuffle(arr) {
     const a = [...arr];
@@ -958,7 +1000,7 @@
     return a;
   }
 
-  function buildExamDeck() {
+  function buildLetterExamDeck() {
     const chars = LETTERS.flatMap(l => [l, l.toLowerCase()]);
     return shuffle(chars).map(ch => {
       const upper = ch.toUpperCase();
@@ -966,29 +1008,67 @@
     });
   }
 
+  function buildMathExamDeck() {
+    return shuffle([...NUMBER_BONDS]).map(bond => ({
+      key: bond.key, bond, missingIndex: randInt(0, 2), color: bond.color
+    }));
+  }
+
+  function updateTimerDisplay() {
+    const el   = document.getElementById('exam-timer');
+    const mins = Math.floor(examTimeLeft / 60);
+    const secs = examTimeLeft % 60;
+    el.textContent = `⏱ ${mins}:${secs.toString().padStart(2, '0')}`;
+    el.classList.toggle('urgent', examTimeLeft <= 20);
+  }
+
+  function startExamTimer() {
+    examTimeLeft = 120;
+    updateTimerDisplay();
+    document.getElementById('exam-timer').classList.add('visible');
+    examTimerId = setInterval(() => {
+      examTimeLeft--;
+      updateTimerDisplay();
+      if (examTimeLeft <= 0) {
+        clearInterval(examTimerId);
+        examTimerId = null;
+        endExam(false, true);
+      }
+    }, 1000);
+  }
+
+  function stopExamTimer() {
+    clearInterval(examTimerId);
+    examTimerId = null;
+    document.getElementById('exam-timer').classList.remove('visible', 'urgent');
+  }
+
   function updateExamHUD() {
     document.getElementById('exam-lives').textContent =
       '❤️'.repeat(examLives) + '🖤'.repeat(3 - examLives);
-    document.getElementById('exam-progress').textContent = `${examIndex + 1} / 52`;
+    const total = examKind === 'math' ? 45 : 52;
+    document.getElementById('exam-progress').textContent = `${examIndex + 1} / ${total}`;
   }
 
   function startExam() {
     if (busy) return;
-    examMode = true;
-    examDeck = buildExamDeck();
+    examKind  = mode; // 'letters' or 'math'
+    examMode  = true;
+    examDeck  = examKind === 'math' ? buildMathExamDeck() : buildLetterExamDeck();
     examIndex = 0;
     examLives = 3;
-    streak = 0;
+    streak    = 0;
     document.getElementById('streak').textContent = '⭐ 0';
     document.getElementById('tab-letters').classList.remove('active');
     document.getElementById('tab-math').classList.remove('active');
-    document.getElementById('tab-exam').classList.add('active');
-    document.getElementById('letter-char').classList.remove('math-mode');
+    document.getElementById('letter-char').classList.toggle('math-mode', examKind === 'math');
     document.getElementById('stats-btn').style.visibility = 'hidden';
+    document.getElementById('start-exam-btn').style.display = 'none';
     document.getElementById('tip').innerHTML =
       '← missed it &nbsp;|&nbsp; swipe or tap &nbsp;|&nbsp; know it! →';
     updateExamHUD();
     document.getElementById('exam-hud').classList.add('visible');
+    if (examKind === 'math') startExamTimer();
     current = null;
     showCard(examDeck[0], -1);
   }
@@ -1005,13 +1085,13 @@
     burst(correct);
 
     if (!correct && examLives === 0) {
-      setTimeout(() => { busy = false; endExam(false); }, 400);
+      setTimeout(() => { busy = false; endExam(false, false); }, 400);
       return;
     }
 
     examIndex++;
     if (examIndex >= examDeck.length) {
-      setTimeout(() => { busy = false; endExam(true); }, 400);
+      setTimeout(() => { busy = false; endExam(true, false); }, 400);
       return;
     }
 
@@ -1022,44 +1102,51 @@
     }, 320);
   }
 
-  function endExam(won) {
+  function endExam(won, timedOut) {
+    stopExamTimer();
     const title = document.getElementById('exam-result-title');
     const sub   = document.getElementById('exam-result-sub');
+    const total = examKind === 'math' ? 45 : 52;
     if (won) {
       title.textContent = 'You Win! 🏆';
       const note = examLives === 3 ? 'Perfect — no mistakes! 🌟🌟🌟'
                  : examLives === 2 ? 'Only 1 mistake! 🌟🌟'
                  :                   '2 mistakes — still a pass! 🌟';
-      sub.textContent = `All 52 letters done!\n${note}`;
+      sub.textContent = `All ${total} cards done!\n${note}`;
       burst(true); burst(true);
+    } else if (timedOut) {
+      title.textContent = "Time's Up! ⏰";
+      sub.textContent =
+        `Made it to card ${examIndex + 1} of ${total}.\nFinish all ${total} in under 2 minutes! 🔥`;
     } else {
       title.textContent = 'You Lose 💪';
       sub.textContent =
-        `Made it to card ${examIndex + 1} of 52.\nYou can do it — try again! 🔥`;
+        `Made it to card ${examIndex + 1} of ${total}.\nYou can do it — try again! 🔥`;
     }
     document.getElementById('exam-result').classList.add('open');
   }
 
   function exitExam() {
+    stopExamTimer();
     document.getElementById('exam-result').classList.remove('open');
     document.getElementById('exam-hud').classList.remove('visible');
     document.getElementById('stats-btn').style.visibility = '';
+    document.getElementById('start-exam-btn').style.display = '';
     document.getElementById('tip').innerHTML =
       '← not yet &nbsp;|&nbsp; swipe or tap &nbsp;|&nbsp; got it! →';
     examMode = false;
-    // Return to whichever mode was last used (never 'exam')
     const saved = localStorage.getItem('lt_mode');
-    mode = saved === 'exam' || !saved ? 'letters' : saved;
+    mode = !saved || saved === 'exam' ? 'letters' : saved;
     localStorage.setItem('lt_mode', mode);
     document.getElementById('tab-letters').classList.toggle('active', mode === 'letters');
     document.getElementById('tab-math').classList.toggle('active', mode === 'math');
-    document.getElementById('tab-exam').classList.remove('active');
     document.getElementById('letter-char').classList.toggle('math-mode', mode === 'math');
     current = null;
     showCard(pickNext());
   }
 
   // ---- Init ----
+  if (mode === 'exam') { mode = 'letters'; localStorage.setItem('lt_mode', mode); }
   document.getElementById('tab-letters').classList.toggle('active', mode === 'letters');
   document.getElementById('tab-math').classList.toggle('active', mode === 'math');
   document.getElementById('letter-char').classList.toggle('math-mode', mode === 'math');
